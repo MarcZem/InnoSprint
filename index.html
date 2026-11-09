@@ -1,37 +1,157 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f5f4ef"><meta name="description" content="Sicher unterwegs in München – ruhige ÖPNV-Routen, Begleitung und Hilfe auf einen Blick.">
-  <title>GutAnkommen · Sicher unterwegs</title><link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f6f1">
+  <meta name="description" content="Ruhigere Regionalbus-Routen im Münchner Umland planen und die Fahrt mit einer vertrauten Person teilen.">
+  <title>GutAnkommen · Regionalbus planen</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="#start" aria-label="GutAnkommen Startseite"><span class="brand-mark">✓</span><span>Gut<span class="brand-light">Ankommen</span></span></a><div class="top-right"><span class="location"><i></i> München & Umland</span><button class="text-button" id="helpTop">Hilfe</button></div></header>
-  <main id="start">
-    <section class="hero"><div><p class="eyebrow">SICHER UNTERWEGS</p><h1>Ruhiger ans Ziel.</h1><p class="hero-copy">Finde eine entspannte Busverbindung und teile deine Fahrt mit einer vertrauten Person.</p></div><div class="hero-icon" aria-hidden="true">⌖</div></section>
-    <div class="layout">
-      <section class="main-column">
-        <article class="card route-card"><div class="card-heading"><span class="step">1</span><div><h2>Wohin möchten Sie?</h2><p>Wir suchen eine möglichst ruhige Verbindung.</p></div></div>
-          <form id="routeForm" class="route-form"><label for="from">Start</label><div class="input-wrap"><span class="pin start-pin"></span><input id="from" value="Marienplatz, München" autocomplete="street-address" required aria-label="Startort"></div><label for="to">Ziel</label><div class="input-wrap"><span class="pin end-pin"></span><input id="to" placeholder="Adresse oder Haltestelle eingeben" required aria-label="Zielort"></div>
-            <div class="options"><span class="option-label">Was ist Ihnen wichtig?</span><label class="check-option"><input type="checkbox" id="avoidCrowds" checked><span class="checkmark"></span><span>Weniger volle Busse</span></label><label class="check-option"><input type="checkbox" id="fewerChanges"><span class="checkmark"></span><span>Weniger Umsteigen</span></label></div>
-            <button class="primary-button" type="submit"><span>Ruhige Route finden</span><span aria-hidden="true">→</span></button>
-          </form>
-        </article>
-        <section id="results" class="results" aria-live="polite" hidden>
-          <div class="results-title"><div><p class="eyebrow">DEMO-VERBINDUNG · BEISPIELDATEN</p><h2>Diese Route passt gut</h2></div><button id="editRoute" class="text-button">Ändern</button></div>
-          <article class="card journey-card recommended"><div class="rec-banner"><span>✓</span> Ruhigere Wahl</div><div class="journey-top"><div><span class="time">10:24</span><span class="muted">Abfahrt</span></div><div class="duration"><b>38 Min.</b><span>1 Umstieg</span></div><div><span class="time">11:02</span><span class="muted">Ankunft</span></div></div><div class="route-line"><span class="line-dot"></span><div><b>Bus 232</b><span>Marienplatz · 10:24</span></div><span class="occupancy low"><i></i> Eher ruhig</span></div><div class="route-line"><span class="line-dot transfer"></span><div><b>Umstieg: Giesing</b><span>7 Minuten Fußweg</span></div></div><div class="route-line last"><span class="line-dot"></span><div><b>Bus 220</b><span>Giesing · 10:48</span></div><span class="occupancy low"><i></i> Eher ruhig</span></div><div class="journey-actions"><button class="primary-button small" id="startTrip">Fahrt starten <span>→</span></button><a class="secondary-button" id="mapsLink" target="_blank" rel="noopener">In Google Maps öffnen ↗</a></div></article>
-          <details class="card alternate"><summary><span><b>Weitere Verbindung</b><small>Direkter, möglicherweise voller</small></span><span class="alt-time">32 Min.⌄</span></summary><div class="alternate-body"><p>Bus 54 direkt · ca. 32 Min.</p><span class="occupancy high"><i></i> Häufig stärker ausgelastet</span><p class="fineprint">Die Auslastungsanzeige beruht auf historischen MVV-Daten und ist keine Echtzeit-Aussage.</p></div></details>
-          <div class="data-note"><span>ⓘ</span><p><b>Gut zu wissen</b><br>Die Einschätzung zeigt typische Auslastung, keine aktuelle Belegung. Wenn Sie unsicher sind, warten Sie auf den nächsten Bus oder bitten Sie um Hilfe.</p></div>
-        </section>
-        <section id="tripPanel" class="card trip-panel" hidden><div class="trip-head"><span class="live-pulse"></span><div><h2>Gute Fahrt!</h2><p>Ihre Begleitperson kann jetzt mitverfolgen.</p></div><button id="endTrip" class="text-button">Beenden</button></div><div class="trip-progress"><span></span></div><div class="trip-meta"><span>Marienplatz</span><b>Nächster Halt: Ostbahnhof</b><span>Giesing</span></div><div class="share-row"><button id="shareTrip" class="secondary-button">Fahrt teilen <span>↗</span></button><button id="safeButton" class="safe-button">✓ &nbsp; Ich bin sicher angekommen</button></div><p id="shareStatus" class="share-status" aria-live="polite"></p></section>
+  <header class="topbar">
+    <a class="wordmark" href="#plan" aria-label="GutAnkommen Startseite">GutAnkommen</a>
+    <span class="service-area">München und Umland</span>
+  </header>
+
+  <main>
+    <section class="page active" id="page-plan" data-page="plan" aria-labelledby="searchTitle">
+      <div class="page-intro">
+        <p class="kicker">REGIONALBUS · MÜNCHEN</p>
+        <h1 id="searchTitle">Wohin möchten Sie?</h1>
+        <p class="intro-copy">Wir suchen eine Verbindung mit möglichst ruhigen Bussen.</p>
+      </div>
+
+      <form class="search-panel" id="routeForm">
+        <label for="originInput">Start</label>
+        <div class="field-row">
+          <input id="originInput" name="origin" value="Mein Standort" autocomplete="off" list="stopSuggestions" aria-describedby="originHint" required>
+          <button type="button" class="field-action" id="useLocation">Standort verwenden</button>
+        </div>
+        <p class="field-hint" id="originHint">Sie können auch eine MVV-Haltestelle eingeben.</p>
+        <label for="destinationInput">Ziel</label>
+        <input id="destinationInput" name="destination" placeholder="Ort oder Haltestelle eingeben" autocomplete="off" list="stopSuggestions" required>
+        <datalist id="stopSuggestions"></datalist>
+        <button class="button button-primary search-button" type="submit">Regionalbusse suchen</button>
+      </form>
+
+      <section class="location-card" aria-labelledby="locationTitle">
+        <div class="card-title-row">
+          <div>
+            <p class="kicker">IHR STANDORT</p>
+            <h2 id="locationTitle">Standortfenster</h2>
+          </div>
+          <span class="status-pill" id="locationStatus">Noch nicht abgefragt</span>
+        </div>
+        <div class="location-map" id="homeMap" role="img" aria-label="Kartenansicht Ihres Standorts">
+          <div class="map-grid"></div>
+          <div class="map-street street-one"></div><div class="map-street street-two"></div><div class="map-street street-three"></div>
+          <svg id="homeMapSvg" viewBox="0 0 640 220" aria-hidden="true"></svg>
+          <div class="map-label" id="homeMapLabel">Standort bleibt auf diesem Gerät, bis Sie eine Fahrt starten und teilen.</div>
+        </div>
+        <div class="location-foot">
+          <p id="locationMessage">Für den Startpunkt können Sie Ihren aktuellen Standort einmalig abrufen.</p>
+          <button type="button" class="button button-secondary" id="locateButton">Standort abrufen und Start ausfüllen</button>
+        </div>
       </section>
-      <aside class="side-column"><section class="card map-card"><div class="map-head"><div><h2>Auf der Karte</h2><p>Route und Umgebung</p></div><span class="map-label">MÜNCHEN</span></div><div class="map-frame" id="mapFrame"><div class="map-placeholder"><div class="map-water"></div><div class="map-road road-a"></div><div class="map-road road-b"></div><div class="map-road road-c"></div><div class="map-block block-a"></div><div class="map-block block-b"></div><svg class="map-route" viewBox="0 0 400 250" aria-hidden="true"><path d="M80 180 C115 155 128 114 180 125 S260 155 318 62" fill="none" stroke="#176b58" stroke-width="7" stroke-linecap="round" stroke-dasharray="1 0"/><circle cx="80" cy="180" r="10" fill="#176b58" stroke="white" stroke-width="4"/><circle cx="318" cy="62" r="10" fill="#d97732" stroke="white" stroke-width="4"/></svg><span class="map-place place-one">Marienplatz</span><span class="map-place place-two">Giesing</span><span class="map-place place-three">Isar</span><span class="map-attribution">Kartenvorschau · München</span></div><a class="map-link" id="mapExplore" href="https://www.google.com/maps/search/?api=1&query=M%C3%BCnchen" target="_blank" rel="noopener">Google Maps öffnen ↗</a></section>
-        <section class="card support-card"><div class="support-icon">♡</div><div><h2>Sie sind nicht allein.</h2><p>Eine vertraute Person kann Ihre Fahrt begleiten.</p></div><button class="outline-button" id="shareAside">Begleitung einladen <span>↗</span></button><a class="call-button" href="tel:112"><span class="call-icon">☎</span><span><b>Notruf 112</b><small>Bei einem Notfall</small></span><span class="call-arrow">→</span></a><a class="call-button secondary-call" href="tel:08919222"><span class="call-icon">☎</span><span><b>Hilfe anrufen</b><small>Begleitperson kontaktieren</small></span><span class="call-arrow">→</span></a></section>
-        <section class="source-note"><span>DATENBASIS</span><p>MVV-Regionalbusse · Auslastung 2024/25 und Fahrpläne 2024/25</p></section>
-      </aside>
-    </div>
-    <footer><span>GutAnkommen · Ein TUM Innovation Sprint MVP</span><span>Für ruhige und sichere Wege im Münchner Umland</span></footer>
+      <p class="privacy-note">Ihr Standort wird erst während einer aktiven Fahrt an Vercel übertragen, nachdem Sie das Teilen starten. Sie können die Übertragung jederzeit beenden.</p>
+    </section>
+
+    <section class="page" id="page-results" data-page="results" aria-labelledby="resultsTitle" hidden>
+      <button class="back-link" type="button" data-go="plan">Zur Suche</button>
+      <div class="page-heading-row">
+        <div><p class="kicker">IHRE VERBINDUNGEN</p><h1 id="resultsTitle">Regionalbus-Routen</h1><p class="intro-copy" id="routeSummary"></p></div>
+      </div>
+      <div class="date-strip">
+        <label for="departureInput">Abfahrt</label>
+        <input type="datetime-local" id="departureInput">
+        <button class="button button-secondary" id="refreshRoutes" type="button">Neu berechnen</button>
+      </div>
+      <div class="schedule-notice" id="scheduleNotice"></div>
+      <div class="sort-tabs" role="group" aria-label="Routen sortieren">
+        <button type="button" class="sort-tab selected" data-sort="recommended">Empfohlen</button>
+        <button type="button" class="sort-tab" data-sort="quiet">Weniger voll</button>
+        <button type="button" class="sort-tab" data-sort="fast">Schnellste</button>
+      </div>
+      <p class="results-status" id="resultsStatus" aria-live="polite"></p>
+      <div class="route-list" id="routeList"></div>
+      <p class="data-disclaimer">Die Fahrpläne stammen aus dem MVV-GTFS-Stand 2025 und enden am 2. November 2025. Die Auslastung ist historisch, keine Echtzeitmessung. Bitte prüfen Sie die Abfahrt vor der Fahrt in der MVV- oder Google-Maps-Auskunft.</p>
+    </section>
+
+    <section class="page" id="page-detail" data-page="detail" aria-labelledby="detailTitle" hidden>
+      <button class="back-link" type="button" data-go="results">Zurück zu den Verbindungen</button>
+      <p class="kicker">ROUTENDETAILS</p>
+      <h1 id="detailTitle">Ihre Verbindung</h1>
+      <div class="detail-summary" id="detailSummary"></div>
+      <div class="route-map" id="routeMap" role="img" aria-label="Karte des Regionalbus-Weges"><svg viewBox="0 0 720 260" id="routeMapSvg" aria-hidden="true"></svg></div>
+      <div class="detail-steps" id="detailSteps"></div>
+      <div class="source-card" id="routeSourceCard"></div>
+      <div class="detail-actions">
+        <button class="button button-primary" id="startRide" type="button">Fahrt starten</button>
+        <a class="button button-secondary" id="googleDirections" target="_blank" rel="noopener">Google Maps öffnen</a>
+      </div>
+    </section>
+
+    <section class="page" id="page-ride" data-page="ride" aria-labelledby="rideTitle" hidden>
+      <button class="back-link" type="button" data-go="detail">Zur Route</button>
+      <p class="kicker">IHRE FAHRT</p>
+      <h1 id="rideTitle">Gute Fahrt</h1>
+      <p class="intro-copy" id="rideRouteLabel"></p>
+      <div class="ride-map" id="rideMap"><svg viewBox="0 0 720 260" id="rideMapSvg" aria-hidden="true"></svg><div class="rider-position-label" id="riderPositionLabel">Standort noch nicht freigegeben</div></div>
+      <div class="ride-status-card">
+        <div class="card-title-row"><div><p class="kicker">LIVE-STANDORT</p><h2 id="rideStatusTitle">Mit vertrauter Person teilen</h2></div><span class="status-pill" id="rideLiveStatus">Aus</span></div>
+        <p class="ride-explanation" id="rideExplanation">Wenn Sie den Standort freigeben, wird Ihre aktuelle Position während der Fahrt an das private GutAnkommen-Backend übertragen. Wer Ihren persönlichen Begleitlink hat, kann die Position und Route sehen.</p>
+        <button class="button button-primary" id="enableSharing" type="button">Standortfreigabe starten</button>
+        <button class="text-action" id="shareLink" type="button" disabled>Begleitlink senden</button>
+        <p class="live-updated" id="rideUpdated" aria-live="polite"></p>
+      </div>
+      <div class="ride-actions">
+        <button class="button button-safe" id="arrivedButton" type="button">Ich bin sicher angekommen</button>
+        <a class="button button-emergency" href="tel:112">Notruf 112 anrufen</a>
+      </div>
+      <button class="end-ride" id="endRide" type="button">Fahrt beenden und Standort löschen</button>
+    </section>
+
+    <section class="page" id="page-family" data-page="family" aria-labelledby="familyTitle" hidden>
+      <p class="kicker">VERTRAUTE PERSON</p><h1 id="familyTitle">Familie und Begleitung</h1>
+      <p class="intro-copy">Speichern Sie einen Kontakt auf diesem Gerät. Die App ruft ihn erst an, wenn Sie die Nummer antippen.</p>
+      <form class="contact-form" id="contactForm">
+        <label for="contactName">Name</label><input id="contactName" placeholder="Zum Beispiel Anna">
+        <label for="contactPhone">Telefonnummer</label><input id="contactPhone" type="tel" autocomplete="tel" placeholder="Telefonnummer eingeben">
+        <button class="button button-secondary" type="submit">Kontakt speichern</button>
+      </form>
+      <div class="saved-contact" id="savedContact" hidden></div>
+      <div class="family-trip" id="familyTrip">
+        <h2>Geteilte Fahrt</h2><p>Wenn Sie eine Fahrt starten und den Begleitlink senden, kann Ihre vertraute Person den letzten übermittelten Standort sehen.</p>
+        <button class="button button-secondary" id="shareFamilyRide" type="button" disabled>Begleitlink öffnen</button>
+      </div>
+      <div class="schedule-notice">Der Begleitlink ist privat. Senden Sie ihn nur an die Person, die Sie auf der Fahrt begleiten soll. Die Standortfreigabe endet mit „Fahrt beenden“ oder „Sicher angekommen“.</div>
+    </section>
+
+    <section class="page" id="page-important" data-page="important" aria-labelledby="importantTitle" hidden>
+      <p class="kicker">WICHTIGE INFORMATIONEN</p><h1 id="importantTitle">Hilfe und Sicherheit</h1>
+      <div class="emergency-card"><p class="kicker">AKUTE GEFAHR</p><h2>Notruf 112</h2><p>Bei medizinischen Notfällen, Feuer oder unmittelbarer Gefahr.</p><a class="button button-emergency" href="tel:112">112 anrufen</a></div>
+      <div class="source-card"><h2>Ruhige Verbindung wählen</h2><p>Die drei Auslastungsstufen beschreiben historische Messwerte: wenig, mittel oder stark gefüllt. Sie sagen nichts über die aktuelle Sicherheit, freie Sitzplätze oder eine heutige Verspätung aus.</p></div>
+      <div class="source-card"><h2>Fahrplan prüfen</h2><p>Das MVP nutzt den MVV-Regionalbusfahrplan von 2025 als Muster. Vor dem Losgehen bitte die aktuelle Verbindung extern bestätigen.</p><a class="text-action" href="https://www.google.com/maps/search/?api=1&query=MVV+Regionalbus+M%C3%BCnchen" target="_blank" rel="noopener">Google Maps öffnen</a></div>
+    </section>
+
+    <section class="page companion-page" id="page-companion" data-page="companion" aria-labelledby="companionTitle" hidden>
+      <p class="kicker">GETEILTE FAHRT</p><h1 id="companionTitle">Fahrt begleiten</h1>
+      <p class="intro-copy" id="companionSubhead">Standort und Route werden geladen.</p>
+      <div class="ride-map companion-map" id="companionMap"><svg viewBox="0 0 720 260" id="companionMapSvg" aria-hidden="true"></svg><div class="rider-position-label" id="companionPositionLabel">Warte auf den ersten Standort</div></div>
+      <div class="companion-details" id="companionDetails"></div>
+      <p class="live-updated" id="companionUpdated" aria-live="polite"></p>
+      <a class="button button-emergency" href="tel:112">Notruf 112 anrufen</a>
+      <p class="data-disclaimer">Diese Ansicht ist mit einem privaten Begleitlink erreichbar. Sie zeigt den zuletzt übertragenen Standort, keine garantierte Echtzeitposition.</p>
+    </section>
   </main>
-  <dialog id="peerDialog" class="peer-dialog"><button class="dialog-close" id="closeDialog" aria-label="Schließen">×</button><p class="eyebrow">GETEILTE FAHRT</p><h2>Anna ist unterwegs</h2><p class="muted">Du kannst die Fahrt bis zur sicheren Ankunft begleiten.</p><div class="peer-map"><div class="peer-marker">●</div><span>Bus 232 · Richtung Giesing</span></div><div class="peer-detail"><span>Start<b id="peerOrigin">Marienplatz</b></span><span>Ziel<b id="peerDestination">Giesing</b></span><span>Ankunft etwa<b>11:02 Uhr</b></span><span>Status<b class="peer-status"><i></i> Unterwegs · Demo</b></span></div><a class="primary-button dialog-call" href="tel:112">☎ &nbsp; Notruf 112</a><p class="fineprint">Standort wird in diesem Demo nur auf diesem Gerät simuliert.</p></dialog>
-  <script src="app.js"></script>
-</body></html>
+
+  <nav class="bottom-nav" aria-label="Hauptnavigation">
+    <button type="button" class="nav-item active" data-go="plan">Planen</button>
+    <button type="button" class="nav-item" data-go="family">Familie</button>
+    <button type="button" class="nav-item" data-go="important">Wichtig</button>
+  </nav>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
