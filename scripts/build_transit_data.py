@@ -133,7 +133,8 @@ def main() -> None:
             lon = parent.get("stop_lon") or stop.get("stop_lon") or ""
             if cid not in stop_rows:
                 stop_rows[cid] = {"id": cid, "name": parent.get("stop_name") or stop.get("stop_name") or cid,
-                                  "lat": float(lat) if lat else None, "lon": float(lon) if lon else None}
+                                  "lat": float(lat) if lat else None, "lon": float(lon) if lon else None,
+                                  "wheelchairBoarding": int(parent.get("wheelchair_boarding") or stop.get("wheelchair_boarding") or 0)}
 
     stop_list = list(stop_rows.values())
     stop_index = {s["id"]: i for i, s in enumerate(stop_list)}

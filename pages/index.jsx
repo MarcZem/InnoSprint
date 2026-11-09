@@ -2,17 +2,24 @@ import { readFile } from 'node:fs/promises';
 import Head from 'next/head';
 import { useEffect } from 'react';
 import VoiceRouteControl from '../components/VoiceRouteControl.jsx';
+import PreferencesPanel from '../components/PreferencesPanel.jsx';
+import InteractiveTransitMaps from '../components/InteractiveTransitMaps.jsx';
+import EventAlerts from '../components/EventAlerts.jsx';
 
 export async function getStaticProps() {
   const html = await readFile('index.html', 'utf8');
   const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? '';
+  const [stops, events] = await Promise.all([
+    readFile('public/data/stops.json', 'utf8').then(JSON.parse),
+    readFile('public/data/local-events.json', 'utf8').then(JSON.parse),
+  ]);
   const shell = body
     .replace(/\s*<script[^>]*src=["']app\.js["'][^>]*><\/script>/i, '')
     .replace('<button class="button button-primary search-button"', '<div id="voice-root"></div><button class="button button-primary search-button"');
-  return { props: { shell } };
+  return { props: { shell, stops, events: events.events } };
 }
 
-export default function Home({ shell }) {
+export default function Home({ shell, stops, events }) {
   useEffect(() => {
     const script = document.createElement('script');
     script.src = '/app.js';
@@ -31,5 +38,8 @@ export default function Home({ shell }) {
     </Head>
     <div id="app-shell" dangerouslySetInnerHTML={{ __html: shell }} />
     <VoiceRouteControl />
+    <PreferencesPanel />
+    <InteractiveTransitMaps stops={stops} events={events} />
+    <EventAlerts events={events} />
   </>;
 }

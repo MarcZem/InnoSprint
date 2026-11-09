@@ -19,8 +19,10 @@
       <div class="page-intro">
         <p class="kicker">REGIONALBUS · MÜNCHEN</p>
         <h1 id="searchTitle">Wohin möchten Sie?</h1>
-        <p class="intro-copy">Wir suchen eine Verbindung mit möglichst ruhigen Bussen.</p>
+        <p class="intro-copy">Wir berücksichtigen Ihre Sicherheits- und Mobilitätswünsche.</p>
       </div>
+
+      <aside class="safety-banner"><strong>Gut ankommen beginnt mit einem sicheren Gefühl.</strong><span>Historische Auslastung ist keine Echtzeit-Sicherheitsmeldung.</span></aside>
 
       <form class="search-panel" id="routeForm">
         <label for="originInput">Start</label>
@@ -43,12 +45,7 @@
           </div>
           <span class="status-pill" id="locationStatus">Noch nicht abgefragt</span>
         </div>
-        <div class="location-map" id="homeMap" role="img" aria-label="Kartenansicht Ihres Standorts">
-          <div class="map-grid"></div>
-          <div class="map-street street-one"></div><div class="map-street street-two"></div><div class="map-street street-three"></div>
-          <svg id="homeMapSvg" viewBox="0 0 640 220" aria-hidden="true"></svg>
-          <div class="map-label" id="homeMapLabel">Standort bleibt auf diesem Gerät, bis Sie eine Fahrt starten und teilen.</div>
-        </div>
+        <div class="location-map" id="homeMap" aria-label="Interaktive Google Maps Karte"><div id="google-map-home"></div></div>
         <div class="location-foot">
           <p id="locationMessage">Für den Startpunkt können Sie Ihren aktuellen Standort einmalig abrufen.</p>
           <button type="button" class="button button-secondary" id="locateButton">Standort abrufen und Start ausfüllen</button>
@@ -68,6 +65,7 @@
         <button class="button button-secondary" id="refreshRoutes" type="button">Neu berechnen</button>
       </div>
       <div class="schedule-notice" id="scheduleNotice"></div>
+      <div id="events-root"></div>
       <div class="sort-tabs" role="group" aria-label="Routen sortieren">
         <button type="button" class="sort-tab selected" data-sort="recommended">Empfohlen</button>
         <button type="button" class="sort-tab" data-sort="quiet">Weniger voll</button>
@@ -83,13 +81,19 @@
       <p class="kicker">ROUTENDETAILS</p>
       <h1 id="detailTitle">Ihre Verbindung</h1>
       <div class="detail-summary" id="detailSummary"></div>
-      <div class="route-map" id="routeMap" role="img" aria-label="Karte des Regionalbus-Weges"><svg viewBox="0 0 720 260" id="routeMapSvg" aria-hidden="true"></svg></div>
+      <div class="route-map" id="routeMap" aria-label="Interaktive Karte der Route"><div id="google-map-route"></div></div>
       <div class="detail-steps" id="detailSteps"></div>
       <div class="source-card" id="routeSourceCard"></div>
       <div class="detail-actions">
         <button class="button button-primary" id="startRide" type="button">Fahrt starten</button>
         <a class="button button-secondary" id="googleDirections" target="_blank" rel="noopener">Google Maps öffnen</a>
       </div>
+    </section>
+
+    <section class="page" id="page-preferences" data-page="preferences" aria-labelledby="preferencesTitle" hidden>
+      <button class="back-link" type="button" data-go="plan">Zur Suche</button>
+      <p class="kicker">IHRE FAHRT</p><h1 id="preferencesTitle">Was ist Ihnen wichtig?</h1>
+      <div id="preferences-root"></div>
     </section>
 
     <section class="page" id="page-ride" data-page="ride" aria-labelledby="rideTitle" hidden>
@@ -148,8 +152,9 @@
 
   <nav class="bottom-nav" aria-label="Hauptnavigation">
     <button type="button" class="nav-item active" data-go="plan">Planen</button>
-    <button type="button" class="nav-item" data-go="family">Familie</button>
-    <button type="button" class="nav-item" data-go="important">Wichtig</button>
+    <button type="button" class="nav-item" data-go="preferences">Wünsche</button>
+    <button type="button" class="nav-item" data-go="family">Begleitung</button>
+    <button type="button" class="nav-item" data-go="important">Hilfe</button>
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js" defer></script>

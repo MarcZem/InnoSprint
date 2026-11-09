@@ -11,9 +11,31 @@
 - **Fahrt:** Live-Standortfreigabe ausdrücklich starten, privaten Begleitlink senden, Fahrt beenden oder die sichere Ankunft bestätigen.
 - **Familie:** Einen Kontakt lokal auf dem Gerät speichern und während einer aktiven Fahrt den Begleitlink erneut teilen.
 - **Wichtig:** Notruf 112 und Hinweise zu Auslastungs- und Fahrplandaten.
+- **Wünsche:** Die sechs gewünschten Präferenzen werden lokal gespeichert und in der Routensortierung, beim Umsteigen und beim Vorlesen berücksichtigt.
 - **Begleitansicht:** Ein Link mit zufälliger UUID zeigt den letzten übertragenen Standort, die gewählte Busroute und den Zeitpunkt der Übertragung.
 
-Das Design nutzt große Bedienelemente, reduzierte Farben und klare Texte. Die mobile Ansicht bleibt auf dieselben drei Navigationsbereiche beschränkt.
+Das Design nutzt größere Schrift, starke Kontraste, gut sichtbare Fokusrahmen und große Touch-Ziele. Warnungen stehen vor sekundären Fahrplandetails. Die Karte lässt sich für eine größere Ansicht aufziehen.
+
+## Sicherheits- und Mobilitätswünsche
+
+Im Menü „Was ist Ihnen wichtig?“ stehen diese sechs Optionen zur Verfügung:
+
+- Keine Treppen, nur Aufzug oder ebenerdig
+- Ich fahre mit Rollator
+- Lieber sitzen als schnell sein
+- Möglichst wenig umsteigen
+- Mehr Zeit beim Umsteigen
+- Ansagen automatisch vorlesen
+
+Die Auswahl bleibt in `localStorage` auf diesem Gerät. Weniger Umsteigen erhöht die Gewichtung von Umstiegen; „Mehr Zeit“ setzt mindestens zwölf Minuten Umsteigezeit; Sitz- und Rollatorwünsche bevorzugen weniger volle Abschnitte, weniger Umstiege und kürzere Fußwege. „Ansagen automatisch vorlesen“ liest die ausgewählte Fahrt im Browser vor. Barrierefreiheit wird anhand des GTFS-Felds `wheelchair_boarding` eingeordnet. Fehlende Daten gelten als **unbestätigt**, nicht als barrierefrei. Die Daten können Aufzüge und ebenerdige Zugänge nicht zuverlässig belegen.
+
+## Interaktive Karte
+
+Die Kartenkomponente basiert auf `@react-google-maps/api`. Sie zeigt Bus-Haltestellen und die ausgewählte Route. Die Auslastungsebene markiert historisch stark gefüllte Segmente; die Veranstaltungsebene markiert Veranstaltungsorte. Aufzug-, Rolltreppen-, Auskunfts- und Sicherheitshinweise lassen sich einzeln über Google Places suchen. Diese Suchtreffer bestätigen weder Funktion noch Zugänglichkeit vor Ort. Der Maps-Schlüssel muss als `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` im Vercel-Projekt eingetragen, auf die Produktions- und Preview-Domains beschränkt und für Maps JavaScript API sowie Places API (New) freigeschaltet sein. Ohne Schlüssel zeigt die App einen klaren Hinweis an.
+
+## Veranstaltungshinweise
+
+`public/data/local-events.json` enthält bestätigte Veranstaltungstermine für München aus den offiziellen Kalendern von [Allianz Arena](https://allianz-arena.com/en/news/next-matches-at-the-allianz-arena/) und [Olympiapark November](https://www.olympiapark.de/de/veranstaltungen/kalender/2026/november) sowie [Dezember](https://www.olympiapark.de/de/veranstaltungen/kalender/2026/dezember). Bei einer Route in Veranstaltungsnähe und passendem Reisetag/-zeitraum erscheint eine Warnung und, sofern vorhanden, eine Route ohne Veranstaltungsnähe. Termine in der JSON-Datei müssen regelmäßig aus den Veranstalterkalendern aktualisiert werden. Die Warnung beschreibt erwarteten Kontextandrang, keine Echtzeit-Überfüllung. Weil dieses MVP nur Regionalbusse abbildet, fehlen U-Bahn- und Tramverbindungen rund um die Veranstaltungsorte.
 
 ## Regionalbus-Routing
 
@@ -61,7 +83,10 @@ Der Standort wird an die Vercel-Projektablage in Frankfurt übertragen, damit di
 - `index.html` – reduzierte Seitenstruktur für Suche, Ergebnisse, Details, Fahrt, Familie, Hilfe und Begleitansicht.
 - `styles.css` – barriereärmere Typografie, Touch-Ziele, Auslastungsstufen, Karten und mobile Layouts.
 - `app.js` – Standort-Autofill, Fahrplanindex, Bus-only-Routensuche, Bewertung, Teilen und Begleitansicht.
-- `components/VoiceRouteControl.jsx` – MediaRecorder-Aufnahme, Upload und Anzeige der Transkription.
+- `components/VoiceRouteControl.jsx` – MediaRecorder-Aufnahme mit Aufnahme-, Verarbeitungs- und Fehlerstatus sowie Multipart-Upload.
+- `components/PreferencesPanel.jsx` – lokale Speicherung und Änderungsereignisse für die sechs Fahrtpräferenzen.
+- `components/InteractiveTransitMaps.jsx` – Google-Maps-Karten, Routen-/Auslastungslayer und Google-Places-Suche für Einrichtungen.
+- `components/EventAlerts.jsx` – Kontextwarnung und ruhigere Alternativroute bei lokalen Veranstaltungen.
 - `pages/api/transcribe.js` – nimmt Multipart-Audio entgegen, leitet es mit `whisper-large-v3-turbo` an Groq weiter und gibt `{ "text": "…" }` zurück.
 - `pages/api/location/[id].js` – private Live-Standort-API mit UUID-Link, Eingabeprüfung und Vier-Stunden-Ablauf.
 - `pages/api/cleanup.js` – tägliche Bereinigung abgelaufener Standortdaten.
@@ -70,6 +95,7 @@ Der Standort wird an die Vercel-Projektablage in Frankfurt übertragen, damit di
 - `scripts/fetch_transit_sources.py` – lädt die öffentlichen Quelldateien nach `/private/tmp`.
 - `scripts/build_transit_data.py` – erzeugt die kompakten JSON-Daten unter `public/data/`.
 - `public/data/` – generierte Haltestellen-, Fahrplan- und Auslastungsdaten für den Client.
+- `public/data/local-events.json` – kuratierte Veranstaltungstermine und Veranstalterquellen.
 - `vercel.json` – täglicher Bereinigungslauf.
 
 ## Lokal ausführen
@@ -81,7 +107,7 @@ npm install
 npm run dev
 ```
 
-Die Vercel-Umgebungsvariablen `GROQ_API_KEY` und `BLOB_READ_WRITE_TOKEN` werden serverseitig benötigt. Lokal können sie beispielsweise mit `vercel env pull .env.local` in die nicht versionierte `.env.local` geladen werden. Die App benötigt HTTPS für Mikrofon und Standortzugriff.
+Die Vercel-Umgebungsvariablen `GROQ_API_KEY` und `BLOB_READ_WRITE_TOKEN` werden serverseitig benötigt. `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` wird zum Build-Zeitpunkt in der Browser-App verwendet. Lokal können sie beispielsweise mit `vercel env pull .env.local` in die nicht versionierte `.env.local` geladen werden. Die App benötigt HTTPS für Mikrofon und Standortzugriff.
 
 ### Spracheingabe
 

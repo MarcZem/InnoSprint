@@ -1,7 +1,6 @@
 const STOP_DATA_URL = "/data/stops.json";
 const ROUTE_DATA_URL = "/data/regional-bus-network.json";
 const API_URL = "/api/location";
-const MIN_TRANSFER_MINUTES = 5;
 const MAX_INITIAL_WAIT_MINUTES = 90;
 const MAX_TRIP_STOPS = 16;
 const DAY_BITS = [1, 2, 4, 8, 16, 32, 64];
@@ -17,6 +16,7 @@ let currentPosition = null;
 let currentStartCandidates = [];
 let currentEndCandidates = [];
 let currentRoutes = [];
+let currentSearchDate = null;
 let selectedRoute = null;
 let sortMode = "recommended";
 let activePage = "plan";
@@ -49,6 +49,7 @@ function go(page) {
   });
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.go === page || (page === "results" || page === "detail" || page === "ride") && item.dataset.go === "plan"));
   window.scrollTo({ top: 0, behavior: "smooth" });
+  window.dispatchEvent(new CustomEvent("page:change", { detail: page }));
 }
 
 document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => go(button.dataset.go)));
@@ -77,8 +78,12 @@ function loadNetwork() {
     networkPromise = fetch(ROUTE_DATA_URL, { cache: "force-cache" }).then((response) => {
       if (!response.ok) throw new Error("Der Regionalbus-Datensatz konnte nicht geladen werden.");
       return response.json();
-    }).then((data) => {
+    }).then(async (data) => {
       network = data;
+      try {
+        const eventResponse = await fetch("/data/local-events.json", { cache: "force-cache" });
+        network.events = eventResponse.ok ? (await eventResponse.json()).events : [];
+      } catch { network.events = []; }
       network.hourlyLoads = new Map(data.occupancyHourly.map((row) => [`${row[0]}|${row[1]}|${row[2]}|${row[3]}|${row[4]}`, [row[5], row[6]]]));
       network.pairLoads = new Map(data.occupancyAllHours.map((row) => [`${row[0]}|${row[1]}|${row[2]}|${row[3]}`, [row[4], row[5]]]));
       network.stopById = new Map(data.stops.map((stop, index) => [stop.id, { ...stop, index }]));
@@ -124,6 +129,7 @@ function locateAndFill() {
   el("#locationStatus").textContent = "Standort wird gesucht";
   navigator.geolocation.getCurrentPosition((position) => {
     currentPosition = { lat: position.coords.latitude, lon: position.coords.longitude, accuracy: position.coords.accuracy, timestamp: position.timestamp };
+    window.dispatchEvent(new CustomEvent("location:updated", { detail: currentPosition }));
     const nearby = nearestStops(currentPosition.lat, currentPosition.lon, 1)[0];
     if (nearby && nearby.km <= 2) {
       originInput.value = `Mein Standort · ${nearby.stop.name}`;
@@ -150,6 +156,7 @@ el("#locateButton").addEventListener("click", locateAndFill);
 
 function renderHomeMap() {
   const svg = el("#homeMapSvg");
+  if (!svg) return;
   svg.replaceChildren();
   if (!currentPosition) return;
   const near = nearestStops(currentPosition.lat, currentPosition.lon, 3).filter((x) => x.km < 2);
@@ -262,13 +269,56 @@ function occupancyFor(line, fromId, toId, minute, dayGroup = "wd") {
     || null;
 }
 
+function getPreferences() {
+  try { return JSON.parse(localStorage.getItem("gutankommenPreferences") || "{}"); } catch { return {}; }
+}
+
+function minimumTransferMinutes() {
+  return getPreferences().extraTransferTime ? 12 : 5;
+}
+
+function eventRiskFor(route, date = currentSearchDate) {
+  if (!network?.events?.length || !date) return false;
+  const points = route.legs.flatMap((leg) => leg.stops).filter((stop) => Number.isFinite(stop.lat) && Number.isFinite(stop.lon));
+  return network.events.some((event) => {
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    if (event.date !== dateKey) return false;
+    if (event.time) {
+      const [hour, minute] = event.time.split(":").map(Number);
+      const eventMinute = hour * 60 + minute;
+      const routeMinute = date.getHours() * 60 + date.getMinutes();
+      if (Math.abs(routeMinute - eventMinute) > 180) return false;
+    }
+    return points.some((point) => kmBetween(point.lat, point.lon, event.lat, event.lon) <= event.radiusKm);
+  });
+}
+
+function eventMatchesRouteAndTime(event, route, date) {
+  if (!date) return false;
+  const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  if (event.date !== dateKey) return false;
+  if (event.time) {
+    const [hour, minute] = event.time.split(":").map(Number);
+    if (Math.abs((date.getHours() * 60 + date.getMinutes()) - (hour * 60 + minute)) > 180) return false;
+  }
+  return route.legs.flatMap((leg) => leg.stops).some((stop) => stop.lat != null && kmBetween(stop.lat, stop.lon, event.lat, event.lon) <= event.radiusKm);
+}
+
+function notifyEventContext(date) {
+  const events = [...new Map(currentRoutes.flatMap((route) => network.events.filter((event) => eventMatchesRouteAndTime(event, route, date))).map((event) => [event.id, event])).values()];
+  window.dispatchEvent(new CustomEvent("route:search-context", { detail: {
+    events,
+    routes: currentRoutes.map((route) => ({ eventRisk: Boolean(eventRiskFor(route, date)), peak: route.peak, lines: route.legs.map((leg) => `Bus ${leg.line}`) })),
+  } }));
+}
+
 function makeLeg(tripIndex, boardPosition, endPosition, index, dayGroup) {
   const trip = network.trips[tripIndex];
   const route = network.routes[trip[0]];
   const sequence = trip[3];
   const stopsInLeg = sequence.slice(boardPosition, endPosition + 1).map((point) => {
     const stop = network.stops[point[0]];
-    return { id: stop.id, name: stop.name, lat: stop.lat, lon: stop.lon, arrival: point[1], departure: point[2] };
+    return { id: stop.id, name: stop.name, lat: stop.lat, lon: stop.lon, wheelchairBoarding: stop.wheelchairBoarding, arrival: point[1], departure: point[2] };
   });
   const classes = [];
   let count = 0;
@@ -296,6 +346,8 @@ function appendCandidate(results, legs, start, end, requestedAt, dayGroup) {
   if (duration <= 0 || duration > 260) return;
   const pathKey = `${legs.map((leg) => `${leg.line}:${leg.start.id}:${leg.end.id}`).join("/")}:${legs[0].departure}`;
   if (results.some((route) => route.key === pathKey)) return;
+  const accessibilityFlags = [...allLegStops, start, end].map((stop) => stop.wheelchairBoarding).filter((value) => value === 1 || value === 2);
+  const accessibility = accessibilityFlags.includes(2) ? "not-accessible" : accessibilityFlags.length && accessibilityFlags.length === [...allLegStops, start, end].length ? "accessible" : "unknown";
   const classes = legs.map((leg) => leg.peak).filter((value) => value != null);
   const typicals = legs.map((leg) => leg.typical).filter((value) => value != null);
   results.push({
@@ -304,6 +356,7 @@ function appendCandidate(results, legs, start, end, requestedAt, dayGroup) {
     typical: typicals.length ? Math.round(typicals.reduce((a, b) => a + b, 0) / typicals.length) : null,
     sampleCount: legs.reduce((sum, leg) => sum + leg.sampleCount, 0),
     allStopIds: [...new Set(allLegStops.map((stop) => stop.id))],
+    accessibility,
   });
 }
 
@@ -347,7 +400,7 @@ function generateRoutes(startCandidates, endCandidates, departureDate) {
       let examinedHere = 0;
       for (const visit of nextVisits) {
         const [secondTripIndex, secondBoard, secondDeparture] = visit;
-        if (secondDeparture < transferPoint[1] + MIN_TRANSFER_MINUTES) continue;
+        if (secondDeparture < transferPoint[1] + minimumTransferMinutes()) continue;
         if (secondDeparture > transferPoint[1] + 80) break;
         if (++examinedHere > 30) break;
         const secondTrip = network.trips[secondTripIndex];
@@ -373,7 +426,8 @@ function generateRoutes(startCandidates, endCandidates, departureDate) {
 
   const unique = new Map();
   found.forEach((route) => { if (!unique.has(route.key)) unique.set(route.key, route); });
-  return [...unique.values()];
+  const preferences = getPreferences();
+  return [...unique.values()].filter((route) => !(preferences.stepFree && route.accessibility === "not-accessible"));
 }
 
 function scoreRoute(route) {
@@ -382,10 +436,16 @@ function scoreRoute(route) {
     return occupancyFor(leg.line, leg.stops[i].id, next.id, leg.stops[i].departure, route.dayGroup)?.[0] ?? 2;
   }));
   const crowdCost = levels.reduce((sum, level) => sum + (level === 1 ? 0 : level === 2 ? 8 : 22), 0);
-  const transferCost = route.transfers * 8;
-  if (sortMode === "fast") return route.duration + transferCost;
-  if (sortMode === "quiet") return (route.peak || 2) * 100 + crowdCost + transferCost + route.duration * 0.05;
-  return route.duration + transferCost + crowdCost;
+  const preferences = getPreferences();
+  const transferCost = route.transfers * (preferences.fewTransfers ? 70 : 8);
+  const walkingCost = (route.start.walkMinutes || 0) + (route.end.walkMinutes || 0);
+  const accessibilityCost = preferences.stepFree ? (route.accessibility === "accessible" ? 0 : 600) : 0;
+  const rollatorCost = preferences.rollator ? route.transfers * 24 + walkingCost * 12 : 0;
+  const eventCost = eventRiskFor(route) ? 3000 : 0;
+  const seatCost = preferences.preferSeat ? crowdCost * 5 : crowdCost;
+  if (sortMode === "fast" && !preferences.preferSeat) return route.duration + transferCost + accessibilityCost + rollatorCost + eventCost;
+  if (sortMode === "quiet" || preferences.preferSeat) return (route.peak || 2) * 100 + seatCost + transferCost + walkingCost + accessibilityCost + rollatorCost + eventCost;
+  return (route.peak || 2) * 100 + seatCost + transferCost + route.duration * 0.2 + walkingCost + accessibilityCost + rollatorCost + eventCost;
 }
 
 function formatTime(minutes) {
@@ -414,13 +474,17 @@ function routeCard(route, index) {
   const badgeClass = route.peak === 3 ? "full" : route.peak === 2 ? "medium" : "";
   const badge = route.peak === 3 ? "Stark gefüllter Abschnitt" : route.peak === 2 ? "Teils mittel gefüllt" : route.peak === 1 ? "Meist wenig gefüllt" : "Noch keine Messwerte";
   const lineChips = route.legs.map((leg) => `<span class="line-chip">Bus ${esc(leg.line)}</span>`).join("");
+  const preferences = getPreferences();
   const sub = route.legs.length > 1 ? `${route.transfers} Umstieg · ${route.legs.map((leg) => esc(leg.end.name)).slice(0, -1).join(" · ")}` : "Direkte Busverbindung";
+  const accessNote = (preferences.stepFree || preferences.rollator) ? `<p class="route-safety-note ${route.accessibility === "accessible" ? "verified" : "unverified"}">${route.accessibility === "accessible" ? "Barrierefreiheit laut Fahrplandaten gemeldet" : route.accessibility === "not-accessible" ? "Barrierefreiheit nicht gegeben" : "Barrierefreiheit nicht bestätigt"}</p>` : "";
+  const eventNote = eventRiskFor(route) ? `<p class="route-safety-note event-inline">Veranstaltungsandrang in der Nähe möglich</p>` : "";
   return `<article class="route-card" role="button" tabindex="0" data-route-index="${index}" aria-label="Route ${index + 1}: ${esc(route.legs.map((leg) => `Bus ${leg.line}`).join(", "))}, ${route.duration} Minuten, ${esc(badge)}">
     <div class="route-card-head"><div><p class="route-card-title">${route.legs.length > 1 ? `${route.legs.map((leg) => `Bus ${esc(leg.line)}`).join(" · ")}` : `Bus ${esc(route.legs[0].line)}`}</p><p class="route-card-subtitle">${sub}</p></div><span class="route-badge ${badgeClass}">${esc(badge)}</span></div>
     <div class="route-times"><strong>${formatTime(route.startMinute)}</strong><span>bis</span><strong>${formatTime(route.endMinute)}</strong><span class="time-duration">${route.duration} Min.</span></div>
     <div class="bus-lines">${lineChips}</div>
     <div class="occupancy-row">${meter(route.peak)}<span class="load-label">${esc(crowdLabel(route.peak))}</span></div>
-    <div class="route-card-foot"><span>${route.sampleCount.toLocaleString("de-DE")} historische Streckenmessungen · ${route.transfers ? `${route.transfers} Umstieg` : "Ohne Umstieg"}</span><strong>Details ansehen</strong></div>
+    ${accessNote}${eventNote}
+    <div class="route-card-foot"><span>${route.transfers ? `${route.transfers} Umstieg` : "Ohne Umstieg"}</span><strong>Details ansehen</strong></div>
   </article>`;
 }
 
@@ -472,7 +536,11 @@ function drawMap(svg, points, current = null, width = 720, height = 260) {
 function routePoints(route) {
   const points = [];
   route.legs.forEach((leg) => {
-    leg.stops.forEach((stop, index) => points.push({ ...stop, legStart: index === 0 }));
+    leg.stops.forEach((stop, index) => {
+      const next = leg.stops[index + 1];
+      const load = next ? occupancyFor(leg.line, stop.id, next.id, stop.departure, route.dayGroup) : null;
+      points.push({ ...stop, level: load?.[0] ?? null, legStart: index === 0 });
+    });
   });
   return points;
 }
@@ -503,13 +571,15 @@ function showDetail(route) {
   selectedRoute = route;
   const lines = route.legs.map((leg) => `Bus ${leg.line}`).join(" · ");
   el("#detailTitle").textContent = `${route.legs.length > 1 ? "Ruhiger umsteigen" : "Direkt mit dem Regionalbus"}`;
-  el("#detailSummary").innerHTML = `<div class="detail-summary-title">${esc(lines)} · ${route.duration} Minuten</div><div class="detail-summary-meta">${formatTime(route.startMinute)} bis ${formatTime(route.endMinute)} · ${route.transfers ? `${route.transfers} Umstieg` : "ohne Umstieg"} · ${esc(crowdLabel(route.peak))}</div>`;
+  const preferences = getPreferences();
+  const safetyWarning = (preferences.stepFree || preferences.rollator) && route.accessibility !== "accessible" ? `<p class="route-access-warning" role="status">Bitte prüfen: Barrierefreiheit ist für diese Route nicht bestätigt.</p>` : "";
+  el("#detailSummary").innerHTML = `<div class="detail-summary-title">${esc(lines)} · ${route.duration} Minuten</div><div class="detail-summary-meta">${formatTime(route.startMinute)} bis ${formatTime(route.endMinute)} · ${route.transfers ? `${route.transfers} Umstieg` : "ohne Umstieg"} · ${esc(crowdLabel(route.peak))}</div>${safetyWarning}`;
   const points = routePoints(route);
-  drawMap(el("#routeMapSvg"), points);
+  window.dispatchEvent(new CustomEvent("route:map", { detail: { points } }));
   const html = [];
   if (route.start.walkMinutes) html.push(walkText(route.start));
   route.legs.forEach((leg, legIndex) => {
-    if (legIndex > 0) html.push(`<div class="transfer-note">Umstieg an ${esc(leg.start.name)} · mindestens ${MIN_TRANSFER_MINUTES} Min. Umsteigezeit</div>`);
+    if (legIndex > 0) html.push(`<div class="transfer-note">Umstieg an ${esc(leg.start.name)} · mindestens ${minimumTransferMinutes()} Min. Umsteigezeit</div>`);
     const stopRows = leg.stops.map((stop, index) => {
       const next = leg.stops[index + 1];
       const load = next ? occupancyFor(leg.line, stop.id, next.id, stop.departure, route.dayGroup) : null;
@@ -522,6 +592,12 @@ function showDetail(route) {
   el("#detailSteps").innerHTML = html.join("");
   const confidence = route.sampleCount >= 100 ? "Viele historische Beobachtungen" : route.sampleCount >= 10 ? "Einige historische Beobachtungen" : route.sampleCount ? "Wenige historische Beobachtungen" : "Keine passenden Messwerte";
   el("#routeSourceCard").innerHTML = `<h2>So ist die Einschätzung gemeint</h2><p>${esc(crowdLabel(route.peak))} ist eine historische Schätzung aus ${route.sampleCount.toLocaleString("de-DE")} passenden Streckenmessungen (${esc(confidence)}). Auslastung ist kein Sicherheitsurteil und keine aktuelle Belegung. Fahrplanmuster: ${esc(network.meta.scheduleStart)} bis ${esc(network.meta.scheduleEnd)}.</p>`;
+  if (preferences.readAloud && "speechSynthesis" in window) {
+    const utterance = new SpeechSynthesisUtterance(`Ihre Fahrt mit ${lines}. Abfahrt ${formatTime(route.startMinute)}. ${route.transfers ? `${route.transfers} Umstieg mit mindestens ${minimumTransferMinutes()} Minuten.` : "Direkte Verbindung."} Historische Auslastung: ${crowdLabel(route.peak)}.`);
+    utterance.lang = "de-DE";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }
   const origin = route.start.lat != null ? `${route.start.lat},${route.start.lon}` : route.start.name;
   const dest = route.end.lat != null ? `${route.end.lat},${route.end.lon}` : route.end.name;
   const waypoints = route.legs.slice(0, -1).map((leg) => `${leg.end.lat},${leg.end.lon}`).join("|");
@@ -545,8 +621,11 @@ async function searchRoutes() {
     await loadNetwork();
     const dateInput = el("#departureInput");
     const chosen = dateInput.value ? new Date(dateInput.value) : new Date(Date.now() + 5 * 60000);
+    currentSearchDate = chosen;
     currentStartCandidates = start; currentEndCandidates = end;
     currentRoutes = generateRoutes(start, end, chosen);
+    currentRoutes.forEach((route) => { route.eventRisk = Boolean(eventRiskFor(route, chosen)); });
+    notifyEventContext(chosen);
     el("#routeSummary").textContent = `${start[0].name} → ${end[0].name}`;
     const startDate = network.meta.scheduleStart;
     const endDate = network.meta.scheduleEnd;
@@ -570,6 +649,16 @@ document.querySelectorAll(".sort-tab").forEach((button) => button.addEventListen
   document.querySelectorAll(".sort-tab").forEach((item) => item.classList.toggle("selected", item === button));
   renderRoutes();
 }));
+
+window.addEventListener("preferences:change", (event) => {
+  if (currentSearchDate && currentStartCandidates.length && currentEndCandidates.length) {
+    currentRoutes = generateRoutes(currentStartCandidates, currentEndCandidates, currentSearchDate);
+    currentRoutes.forEach((route) => { route.eventRisk = Boolean(eventRiskFor(route, currentSearchDate)); });
+    renderRoutes();
+    notifyEventContext(currentSearchDate);
+  }
+  if (event.detail?.readAloud) notify("Vorlesen ist eingeschaltet. Routendetails werden vorgelesen.");
+});
 
 function routeSharePayload(route) {
   return {
